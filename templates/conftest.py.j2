@@ -32,7 +32,7 @@ def auth_headers():
 {% elif auth_mode == "token" %}
 @pytest.fixture(scope="session")
 def auth_headers():
-    return {"{{ auth_header_name }}": "{{ auth_prefix }}{{ auth_var_value }}" if "{{ auth_prefix }}" else "{{ auth_var_value }}"}
+    return {"{{ auth_header_name }}": f"{{ auth_prefix }}{settings.{{ auth_env_var }}}"}
 
 {% elif auth_mode == "session" %}
 @pytest.fixture(scope="session")
@@ -46,11 +46,11 @@ def auth_token(session, base_url):
         },
     )
     assert resp.status_code == 200, f"登录失败: {resp.status_code} {resp.text}"
-    token = resp.json()
-    # 按 JSON 路径提取 token
-    for key in "{{ token_json_path }}".split("."):
-        token = token[key]
-    return token
+    token_data = resp.json()
+    # 按路径逐层提取 token
+    for key in {{ token_json_keys }}:
+        token_data = token_data[key]
+    return token_data
 
 
 @pytest.fixture

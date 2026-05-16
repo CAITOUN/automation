@@ -62,17 +62,27 @@ Token 放在后续请求的哪里：
 ```
 
 生成逻辑：
-- conftest.py 中生成 `auth_token` session-scoped fixture：
+- conftest.py 中生成 `auth_token` session-scoped fixture，参考 `templates/conftest.py.j2`
+- 关键变量：
+  - `login_path` → 如 `"/api/user/login"`
+  - `login_username_field` / `login_password_field` → 请求体字段名
+  - `token_json_keys` → Python list 字面量，如 `["data", "token"]`
+  - `auth_header_name` → 如 `"Authorization"`
+  - `auth_prefix` → 如 `"Bearer "`（含末尾空格）
+- 生成后 fixture 示例：
   ```python
   @pytest.fixture(scope="session")
-  def auth_token(settings, base_url):
-      resp = requests.post(f"{base_url}/api/user/login", json={
+  def auth_token(session, base_url):
+      resp = session.post(f"{base_url}/api/user/login", json={
           "username": settings.LOGIN_USERNAME,
-          "password": settings.LOGIN_PASSWORD
+          "password": settings.LOGIN_PASSWORD,
       })
       assert resp.status_code == 200
-      return resp.json()["data"]["token"]
-  
+      token_data = resp.json()
+      for key in ["data", "token"]:
+          token_data = token_data[key]
+      return token_data
+
   @pytest.fixture
   def auth_headers(auth_token):
       return {"Authorization": f"Bearer {auth_token}"}

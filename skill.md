@@ -94,6 +94,38 @@ description: |
 
 重要：解析完成后将数据记忆为 `parsed_data`，后续步骤依赖它。
 
+### 模板额外变量
+
+生成代码时，除上述 `parsed_data` 外，还需根据上下文推导以下变量（各模板文件 `templates/*.j2` 中通过 `{{ 变量名 }}` 引用）：
+
+**模块级变量**（每个 module 计算一次）：
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `module_name` | 模块名，小写 | `user` |
+| `module_class_name` | 模块类名，PascalCase | `User` |
+| `module_description` | 模块描述 | `用户模块` |
+
+**接口级变量**（每个 endpoint 计算一次）：
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `func_name` | 方法名，snake_case | `user_login` |
+| `path_fstring` | 含 Python f-string 占位的路径 | `/api/user/{userId}` |
+| `path_params` | 路径中 {var} 的参数列表 | `[{"name": "userId"}]` |
+| `all_params` | 所有参数（path + query）合并 | 同上结构 |
+| `body_default` | request body 默认值 Python 字面量 | `{"username": "", "password": ""}` |
+| `field_checks` | 响应字段 assert 语句列表 | `['assert "code" in body', ...]` |
+| `response_schema` | 响应 JSON Schema Python dict | `{"type": "object", ...}` |
+| `expected_ok_status` | 期望成功状态码 | `200` / `201` |
+| `required_params` | 必填参数列表 | `[{"name": "username"}]` |
+| `type_checks` | 参数名 → 期望类型 映射 | `{"username": "string"}` |
+
+**场景级变量**（场景流程编排）：
+| 变量 | 说明 |
+|------|------|
+| `scenario_name` / `scenario_description` / `endpoint_chain` | 场景元信息 |
+| `steps[].extract` | 每步提取数据 `{var_name: json_path}` |
+| `params[].from_context` | 参数值从 `scenario_context` 读取的 key |
+
 ---
 
 ## 第 3 步：询问认证模式

@@ -1,6 +1,6 @@
 # api/{{ module_name }}_api.py
 # === AUTO_GENERATED_START ===
-{% if from_swagger %}
+{% if swagger_title %}
 # 来源: {{ swagger_title }}
 {% endif %}
 from api.base_client import BaseClient
@@ -13,12 +13,13 @@ class {{ module_class_name }}API:
         self.client = client
 
 {% for endpoint in endpoints %}
-    def {{ endpoint.func_name }}(self{% for param in endpoint.path_params %}, {{ param.name }}{% endfor %}{% if endpoint.request_body %}, data: dict = None{% endif %}, **kwargs):
+    def {{ endpoint.func_name }}(self{% for p in endpoint.path_params %}, {{ p.name }}{% endfor %}{% if endpoint.request_body %}, data: dict = None{% endif %}, **kwargs):
         """{{ endpoint.summary }}"""
+{% if endpoint.path_params %}
+        path = f"{{ endpoint.path_fstring }}"
+{% else %}
         path = "{{ endpoint.path }}"
-{% for param in endpoint.path_params %}
-        path = path.replace("{{ '{' + param.name + '}' }}", str({{ param.name }}))
-{% endfor %}
+{% endif %}
 {% if endpoint.request_body %}
         kwargs["json"] = data
 {% endif %}

@@ -1,6 +1,5 @@
 # utils/validator.py — 响应校验 & 快捷断言
 # === AUTO_GENERATED_START ===
-import json
 
 
 def assert_ok(resp, expected_status=200):
@@ -16,7 +15,6 @@ def assert_field(resp, json_path, expected_type=None):
 
     json_path: "data.token" → resp.json()["data"]["token"]
     """
-    body = resp.json() if isinstance(resp.json, dict) else json.loads(resp.text)  # 兼容 Response 对象
     if hasattr(resp, "json") and callable(resp.json):
         body = resp.json()
     else:
@@ -24,8 +22,11 @@ def assert_field(resp, json_path, expected_type=None):
 
     keys = json_path.split(".")
     current = body
-    for key in keys:
-        assert key in current, f"字段 '{json_path}' 不存在（到达 '{key}' 之前: {list(current.keys())}）"
+    for i, key in enumerate(keys):
+        partial = ".".join(keys[: i + 1])
+        assert key in current, (
+            f"字段 '{partial}' 不存在（当前 keys: {list(current.keys())}）"
+        )
         current = current[key]
 
     assert current is not None, f"字段 '{json_path}' 的值为 None"

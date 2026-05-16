@@ -10,8 +10,8 @@ class Settings:
     """从 .env 读取环境配置"""
 
     BASE_URL = os.getenv("BASE_URL", "{{ base_url }}")
-    TIMEOUT = int(os.getenv("TIMEOUT", "{{ default_timeout }}"))
-    RETRY_COUNT = int(os.getenv("RETRY_COUNT", "{{ default_retry }}"))
+    TIMEOUT = int(os.getenv("TIMEOUT", "30"))
+    RETRY_COUNT = int(os.getenv("RETRY_COUNT", "0"))
 
 {% if auth_mode == "token" %}
     {{ auth_env_var }} = os.getenv("{{ auth_env_var }}", "")

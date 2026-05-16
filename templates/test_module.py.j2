@@ -3,6 +3,7 @@
 # 来源: {{ source }}
 # 测试策略: {{ strategy_level }}
 import pytest
+from utils.validator import assert_ok, assert_field, assert_response_time, assert_schema
 {% if strategy_level == "L3" %}
 from data.{{ module_name }}_data import {{ boundary_data_var }}
 {% endif %}
