@@ -40,7 +40,7 @@ def validate(project_path: str) -> bool:
 
     # 检查 .env.example 有 BASE_URL
     env = root / ".env.example"
-    if env.is_file() and "BASE_URL" not in env.read_text():
+    if env.is_file() and "BASE_URL" not in env.read_text(encoding="utf-8"):
         errors.append(".env.example 缺少 BASE_URL")
 
     # 检查 testcases 不为空
@@ -53,7 +53,7 @@ def validate(project_path: str) -> bool:
     gen = root / "generator.json"
     if gen.is_file():
         try:
-            data = json.loads(gen.read_text())
+            data = json.loads(gen.read_text(encoding="utf-8"))
             for key in ("version", "source_type", "generated_endpoints"):
                 if key not in data:
                     errors.append(f"generator.json 缺字段: {key}")
@@ -61,12 +61,12 @@ def validate(project_path: str) -> bool:
             errors.append(f"generator.json 不是合法 JSON: {e}")
 
     if errors:
-        print("❌ 项目校验失败：")
+        print("[FAIL] Project validation failed:")
         for e in errors:
             print(f"  - {e}")
         return False
 
-    print("✅ 项目结构校验通过")
+    print("[OK] Project structure valid")
     return True
 
 
