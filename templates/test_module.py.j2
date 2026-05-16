@@ -1,0 +1,138 @@
+# testcases/test_{{ module_name }}.py
+# === AUTO_GENERATED_START ===
+# 来源: {{ source }}
+# 测试策略: {{ strategy_level }}
+import pytest
+{% if strategy_level == "L3" %}
+from data.{{ module_name }}_data import {{ boundary_data_var }}
+{% endif %}
+
+
+@pytest.fixture
+def api(client):
+    from api.{{ module_name }}_api import {{ module_class_name }}API
+    return {{ module_class_name }}API(client)
+
+
+{% for endpoint in endpoints %}
+# ——— {{ endpoint.summary }} ———
+
+{% if strategy_level == "L1" %}
+def test_{{ endpoint.func_name }}(api, auth_headers):
+    """冒烟测试：{{ endpoint.summary }}"""
+    resp = api.{{ endpoint.func_name }}(
+{% for param in endpoint.all_params %}
+        {{ param.name }}={{ param.default_value }},
+{% endfor %}
+        headers=auth_headers,
+    )
+    assert resp.status_code == {{ endpoint.expected_ok_status }}
+    assert resp.text
+
+{% elif strategy_level in ("L2", "L3") %}
+def test_{{ endpoint.func_name }}_ok(api, auth_headers):
+    """正常请求：{{ endpoint.summary }}"""
+    resp = api.{{ endpoint.func_name }}(
+{% for param in endpoint.all_params %}
+        {{ param.name }}={{ param.default_value }},
+{% endfor %}
+        headers=auth_headers,
+{% if endpoint.request_body %}
+        data={{ endpoint.body_default }},
+{% endif %}
+    )
+    assert_ok(resp, expected_status={{ endpoint.expected_ok_status }})
+    body = resp.json()
+{% for check in endpoint.field_checks %}
+    {{ check }}
+{% endfor %}
+
+
+def test_{{ endpoint.func_name }}_schema(api, auth_headers):
+    """Schema 校验：{{ endpoint.summary }}"""
+    resp = api.{{ endpoint.func_name }}(
+{% for param in endpoint.all_params %}
+        {{ param.name }}={{ param.default_value }},
+{% endfor %}
+        headers=auth_headers,
+{% if endpoint.request_body %}
+        data={{ endpoint.body_default }},
+{% endif %}
+    )
+    assert_ok(resp, expected_status={{ endpoint.expected_ok_status }})
+    assert_schema(resp.json(), {{ endpoint.response_schema }})
+
+
+def test_{{ endpoint.func_name }}_response_time(api, auth_headers):
+    """响应时间：{{ endpoint.summary }}"""
+    resp = api.{{ endpoint.func_name }}(
+{% for param in endpoint.all_params %}
+        {{ param.name }}={{ param.default_value }},
+{% endfor %}
+        headers=auth_headers,
+{% if endpoint.request_body %}
+        data={{ endpoint.body_default }},
+{% endif %}
+    )
+    assert_response_time(resp, max_ms=2000)
+
+{% if strategy_level == "L3" %}
+def test_{{ endpoint.func_name }}_missing_required(api, auth_headers):
+    """必填参数缺失：{{ endpoint.summary }}"""
+{% for missing_param in endpoint.required_params %}
+    # 缺失 {{ missing_param.name }}
+    resp = api.{{ endpoint.func_name }}(
+{% for param in endpoint.all_params %}
+        {{ param.name }}={{"None" if param == missing_param else param.default_value}},
+{% endfor %}
+        headers=auth_headers,
+    )
+    assert resp.status_code in [400, 422], f"缺失 {{ '{' + missing_param.name + '}' }}: {resp.status_code}"
+{% endfor %}
+
+
+def test_{{ endpoint.func_name }}_invalid_types(api, auth_headers):
+    """参数类型错误：{{ endpoint.summary}}"""
+{% for param in endpoint.all_params %}
+    resp = api.{{ endpoint.func_name }}(
+{% for p in endpoint.all_params %}
+        {{ p.name }}={{ "True" if p == param and endpoint.type_checks[p.name] in ("string", "str") else "12345" if p == param and endpoint.type_checks[p.name] in ("integer", "int") else p.default_value }},
+{% endfor %}
+        headers=auth_headers,
+    )
+    assert resp.status_code in [400, 422], f"{{ param.name }} 类型错误未拦截: {{ '{'} resp.status_code{'}' }}"
+{% endfor %}
+
+
+def test_{{ endpoint.func_name }}_boundary(api, auth_headers):
+    """边界值测试：{{ endpoint.summary }}"""
+    for values, expected in {{ boundary_data_var }}:
+        resp = api.{{ endpoint.func_name }}(**values, headers=auth_headers)
+        assert resp.status_code == expected, f"Failed: {values}"
+
+
+def test_{{ endpoint.func_name }}_unauthorized(api):
+    """未授权访问：{{ endpoint.summary }}"""
+    resp = api.{{ endpoint.func_name }}(
+{% for param in endpoint.all_params %}
+        {{ param.name }}={{ param.default_value }},
+{% endfor %}
+    )
+    assert resp.status_code in [401, 403], f"未授权未拦截: {resp.status_code}"
+
+{% if endpoint.method in ("GET", "PUT", "DELETE") %}
+def test_{{ endpoint.func_name }}_not_found(api, auth_headers):
+    """资源不存在：{{ endpoint.summary }}"""
+    resp = api.{{ endpoint.func_name }}(
+{% for param in endpoint.all_params %}
+        {{ param.name }}={{"999999"}},
+{% endfor %}
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404, f"资源不存在未返回 404: {resp.status_code}"
+{% endif %}
+{% endif %}
+{% endif %}
+
+{% endfor %}
+# === AUTO_GENERATED_END ===

@@ -1,0 +1,72 @@
+# conftest.py — 全局 fixtures
+# === AUTO_GENERATED_START ===
+# 此区域由 automation skill 自动生成，请勿手动修改
+import pytest
+import requests
+from config.settings import Settings
+
+settings = Settings()
+
+
+@pytest.fixture(scope="session")
+def base_url():
+    """被测服务的基础 URL"""
+    return settings.BASE_URL
+
+
+@pytest.fixture(scope="session")
+def session():
+    """全局 HTTP Session，复用连接"""
+    sess = requests.Session()
+    sess.headers.update({"Content-Type": "application/json"})
+    yield sess
+    sess.close()
+
+
+# === 认证部分（由 auth_mode 决定） ===
+{% if auth_mode == "none" %}
+@pytest.fixture
+def auth_headers():
+    return {}
+
+{% elif auth_mode == "token" %}
+@pytest.fixture(scope="session")
+def auth_headers():
+    return {"{{ auth_header_name }}": "{{ auth_prefix }}{{ auth_var_value }}" if "{{ auth_prefix }}" else "{{ auth_var_value }}"}
+
+{% elif auth_mode == "session" %}
+@pytest.fixture(scope="session")
+def auth_token(session, base_url):
+    """会话登录，获取 token"""
+    resp = session.post(
+        f"{base_url}{{ login_path }}",
+        json={
+            "{{ login_username_field }}": settings.LOGIN_USERNAME,
+            "{{ login_password_field }}": settings.LOGIN_PASSWORD,
+        },
+    )
+    assert resp.status_code == 200, f"登录失败: {resp.status_code} {resp.text}"
+    token = resp.json()
+    # 按 JSON 路径提取 token
+    for key in "{{ token_json_path }}".split("."):
+        token = token[key]
+    return token
+
+
+@pytest.fixture
+def auth_headers(auth_token):
+    return {"{{ auth_header_name }}": "{{ auth_prefix }}{auth_token}"}
+
+{% endif %}
+
+
+@pytest.fixture(scope="session")
+def scenario_context():
+    """场景用例共享数据字典，用于接口间数据传递"""
+    return {}
+
+# === AUTO_GENERATED_END ===
+
+# === USER_CODE_START ===
+# 在此区域编写自定义 fixtures、数据库连接、数据工厂等
+# === USER_CODE_END ===

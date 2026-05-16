@@ -1,0 +1,28 @@
+# api/{{ module_name }}_api.py
+# === AUTO_GENERATED_START ===
+{% if from_swagger %}
+# 来源: {{ swagger_title }}
+{% endif %}
+from api.base_client import BaseClient
+
+
+class {{ module_class_name }}API:
+    """{{ module_description }}"""
+
+    def __init__(self, client: BaseClient):
+        self.client = client
+
+{% for endpoint in endpoints %}
+    def {{ endpoint.func_name }}(self{% for param in endpoint.path_params %}, {{ param.name }}{% endfor %}{% if endpoint.request_body %}, data: dict = None{% endif %}, **kwargs):
+        """{{ endpoint.summary }}"""
+        path = "{{ endpoint.path }}"
+{% for param in endpoint.path_params %}
+        path = path.replace("{{ '{' + param.name + '}' }}", str({{ param.name }}))
+{% endfor %}
+{% if endpoint.request_body %}
+        kwargs["json"] = data
+{% endif %}
+        return self.client.{{ endpoint.method.lower() }}(path, **kwargs)
+
+{% endfor %}
+# === AUTO_GENERATED_END ===

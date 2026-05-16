@@ -1,0 +1,29 @@
+# config/settings.py — 环境配置
+# === AUTO_GENERATED_START ===
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+class Settings:
+    """从 .env 读取环境配置"""
+
+    BASE_URL = os.getenv("BASE_URL", "{{ base_url }}")
+    TIMEOUT = int(os.getenv("TIMEOUT", "{{ default_timeout }}"))
+    RETRY_COUNT = int(os.getenv("RETRY_COUNT", "{{ default_retry }}"))
+
+{% if auth_mode == "token" %}
+    {{ auth_env_var }} = os.getenv("{{ auth_env_var }}", "")
+
+{% elif auth_mode == "session" %}
+    LOGIN_USERNAME = os.getenv("LOGIN_USERNAME", "admin")
+    LOGIN_PASSWORD = os.getenv("LOGIN_PASSWORD", "")
+
+{% endif %}
+
+# === AUTO_GENERATED_END ===
+
+# === USER_CODE_START ===
+# 可在此添加自定义配置项
+# === USER_CODE_END ===

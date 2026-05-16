@@ -1,0 +1,79 @@
+# utils/validator.py — 响应校验 & 快捷断言
+# === AUTO_GENERATED_START ===
+import json
+
+
+def assert_ok(resp, expected_status=200):
+    """断言响应状态码正确且 body 非空"""
+    assert resp.status_code == expected_status, (
+        f"期望 {expected_status}，实际 {resp.status_code}\n{resp.text[:500]}"
+    )
+    assert resp.text, "响应体为空"
+
+
+def assert_field(resp, json_path, expected_type=None):
+    """按 JSON 路径断言字段存在。
+
+    json_path: "data.token" → resp.json()["data"]["token"]
+    """
+    body = resp.json() if isinstance(resp.json, dict) else json.loads(resp.text)  # 兼容 Response 对象
+    if hasattr(resp, "json") and callable(resp.json):
+        body = resp.json()
+    else:
+        body = resp
+
+    keys = json_path.split(".")
+    current = body
+    for key in keys:
+        assert key in current, f"字段 '{json_path}' 不存在（到达 '{key}' 之前: {list(current.keys())}）"
+        current = current[key]
+
+    assert current is not None, f"字段 '{json_path}' 的值为 None"
+
+    if expected_type is not None:
+        type_map = {"str": str, "int": int, "float": float, "bool": bool, "list": list, "dict": dict}
+        expected = type_map.get(expected_type, expected_type)
+        assert isinstance(current, expected), (
+            f"字段 '{json_path}' 类型错误: 期望 {expected}, 实际 {type(current).__name__}"
+        )
+
+
+def assert_response_time(resp, max_ms=2000):
+    """断言响应时间在阈值内（需要请求时记录了 elapsed）"""
+    elapsed = resp.elapsed.total_seconds() * 1000
+    assert elapsed <= max_ms, f"响应时间 {elapsed:.0f}ms 超过阈值 {max_ms}ms"
+
+
+def assert_schema(data, schema):
+    """简化的 JSON Schema 校验（支持 type 和 required）。
+
+    可用于校验响应体结构是否符合预期 schema。
+    """
+    _validate_node(data, schema, "$")
+
+
+def _validate_node(value, schema, path):
+    if "type" in schema:
+        expected = schema["type"]
+        type_map = {
+            "string": str, "integer": int, "number": (int, float),
+            "boolean": bool, "array": list, "object": dict, "null": type(None),
+        }
+        py_type = type_map.get(expected, expected)
+        assert isinstance(value, py_type), (
+            f"{path}: 类型错误，期望 {expected}，实际 {type(value).__name__}"
+        )
+
+    if schema.get("type") == "object" and "properties" in schema:
+        required = schema.get("required", [])
+        for field in required:
+            assert field in value, f"{path}.{field}: 必填字段缺失"
+        for key, sub_schema in schema["properties"].items():
+            if key in value:
+                _validate_node(value[key], sub_schema, f"{path}.{key}")
+
+    if schema.get("type") == "array" and "items" in schema:
+        for i, item in enumerate(value):
+            _validate_node(item, schema["items"], f"{path}[{i}]")
+
+# === AUTO_GENERATED_END ===
