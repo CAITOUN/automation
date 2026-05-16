@@ -13,15 +13,27 @@ class {{ module_class_name }}API:
         self.client = client
 
 {% for endpoint in endpoints %}
-    def {{ endpoint.func_name }}(self{% for p in endpoint.path_params %}, {{ p.name }}{% endfor %}{% if endpoint.request_body %}, data: dict = None{% endif %}, **kwargs):
+    def {{ endpoint.func_name }}(self{% for p in endpoint.path_params %}, {{ p.name }}{% endfor %}{% if endpoint.has_body %}, data=None{% endif %}{% if endpoint.has_query_params %}, **params{% endif %}, **kwargs):
         """{{ endpoint.summary }}"""
 {% if endpoint.path_params %}
         path = f"{{ endpoint.path_fstring }}"
 {% else %}
         path = "{{ endpoint.path }}"
 {% endif %}
-{% if endpoint.request_body %}
-        kwargs["json"] = data
+{% if endpoint.has_query_params %}
+        kwargs["params"] = {k: v for k, v in params.items() if v is not None}
+{% endif %}
+{% if endpoint.content_type == "json" %}
+        if data is not None:
+            kwargs["json"] = data
+{% elif endpoint.content_type == "form" %}
+        if data is not None:
+            kwargs["data"] = data
+{% elif endpoint.content_type == "multipart" %}
+        if data is not None:
+            kwargs["data"] = data
+        if file_path is not None:
+            kwargs["files"] = {"file": open(file_path, "rb")}
 {% endif %}
         return self.client.{{ endpoint.method.lower() }}(path, **kwargs)
 

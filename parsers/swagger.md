@@ -64,16 +64,27 @@ schemes[0] + "://" + host + basePath  → 如 "https://api.example.com/v2"
    - `summary`：`summary` 字段
    - `tags`：`tags` 数组
    - `parameters`：path/query/header 参数
-   - `request_body`：`requestBody.content["application/json"].schema`
+   - `request_body`：`requestBody.content` 中提取 schema 和 content_type
    - `responses`：提取所有 status code 的 response schema
 
 3. **参数解析**（OpenAPI 3.x）：
    ```
    parameters[].name / in (path|query|header) / required / schema.type / description
    ```
+   根据 `in` 字段分类：
+   - `path` → path_params
+   - `query` → query_params → 标记 `has_query_params: true`
+   - `header` → 放入 headers（部分可能是认证用）
 
-4. **request_body 解析**（OpenAPI 3.x）：
+4. **request_body / content_type 解析**（OpenAPI 3.x）：
    ```
+   requestBody.content 的 key 就是 content_type：
+     "application/json"                  → content_type: "json"
+     "application/x-www-form-urlencoded" → content_type: "form"
+     "multipart/form-data"               → content_type: "multipart"
+   ```
+   如果 content_type 为 "json"/"form" → `has_body: true`
+   如果 content_type 为 "multipart" → `has_body: true`, 标记需要文件上传
    requestBody.required
    requestBody.content["application/json"].schema
    → 展开 $ref 引用

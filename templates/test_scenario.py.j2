@@ -21,8 +21,11 @@ def test_{{ scenario_name }}(api, auth_headers, scenario_context):
         {{ param.name }}={%- if param.from_context %}scenario_context["{{ param.from_context }}"]{%- else %}{{ param.default_value }}{%- endif %},
 {% endfor %}
         headers=auth_headers,
-{% if step.request_body %}
+{% if step.has_body %}
         data={{ step.body }},
+{% endif %}
+{% if step.has_file %}
+        file_path={{ step.file_path }},
 {% endif %}
     )
     assert_ok(resp_{{ loop.index }}{% if step.expected_status != 200 %}, expected_status={{ step.expected_status }}{% endif %})

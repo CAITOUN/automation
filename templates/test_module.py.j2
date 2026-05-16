@@ -26,6 +26,12 @@ def test_{{ endpoint.func_name }}(api, auth_headers):
         {{ param.name }}={{ param.default_value }},
 {% endfor %}
         headers=auth_headers,
+{% if endpoint.has_body %}
+        data={{ endpoint.body_default }},
+{% endif %}
+{% if endpoint.has_file %}
+        file_path={{ endpoint.file_default }},
+{% endif %}
     )
     assert resp.status_code == {{ endpoint.expected_ok_status }}
     assert resp.text
@@ -38,8 +44,11 @@ def test_{{ endpoint.func_name }}_ok(api, auth_headers):
         {{ param.name }}={{ param.default_value }},
 {% endfor %}
         headers=auth_headers,
-{% if endpoint.request_body %}
+{% if endpoint.has_body %}
         data={{ endpoint.body_default }},
+{% endif %}
+{% if endpoint.has_file %}
+        file_path={{ endpoint.file_default }},
 {% endif %}
     )
     assert_ok(resp, expected_status={{ endpoint.expected_ok_status }})
@@ -56,7 +65,7 @@ def test_{{ endpoint.func_name }}_schema(api, auth_headers):
         {{ param.name }}={{ param.default_value }},
 {% endfor %}
         headers=auth_headers,
-{% if endpoint.request_body %}
+{% if endpoint.has_body %}
         data={{ endpoint.body_default }},
 {% endif %}
     )
@@ -71,7 +80,7 @@ def test_{{ endpoint.func_name }}_response_time(api, auth_headers):
         {{ param.name }}={{ param.default_value }},
 {% endfor %}
         headers=auth_headers,
-{% if endpoint.request_body %}
+{% if endpoint.has_body %}
         data={{ endpoint.body_default }},
 {% endif %}
     )

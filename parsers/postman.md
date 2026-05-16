@@ -59,13 +59,21 @@ Collection
   - `auth`：`request.auth` 或 `collection.auth`
   - `query_params`：从 `request.url.query[]` 提取
 
-### 5. 提取请求体
+### 5. 提取请求体 + content_type
 
-Postman body 有多种模式：
+Postman body 有多种模式，映射为 content_type：
+
+| Postman mode | content_type | 说明 |
+|-------------|-------------|------|
+| `raw` (JSON) | `"json"` | `has_body: true` |
+| `urlencoded` | `"form"` | `has_body: true` |
+| `formdata` | `"multipart"` | `has_body: true`（含文件时标记 file 参数）|
+| 无 body（GET） | `null` | `has_body: false`，如有 query 参数则 `has_query_params: true` |
+
 - **raw JSON**（最常见）：`request.body.mode = "raw"` + `request.body.raw`（JSON 字符串）
   - 从 JSON 推断 schema 结构
 - **urlencoded**：`request.body.urlencoded[]`
-- **formdata**：`request.body.formdata[]`
+- **formdata**：`request.body.formdata[]`（字段可能是 `type: "file"` → 文件上传）
 
 ### 6. 提取认证
 

@@ -47,10 +47,27 @@
 2. **提取 HTTP method**：`method` 转大写
 3. **提取 path params**：从 `path` 的正则 `\{(\w+)\}` 匹配（如 `/api/user/{userId}` → `userId`）
 4. **生成 path_fstring**：path 原样保留（含 `{param}` 部分，作为 f-string 模板）
-5. **提取 request_body**：如果有，将字段映射为参数
+5. **提取 content_type**：
+   - 如果 endpoint 有 `content_type` 字段 → 直接使用
+   - 如果没有，根据 method 推断：
+     - POST/PUT/PATCH 通常 → `"json"`
+     - 如果有 `files` 参数 → `"multipart"`
+     - 如果有 `form` 标记 → `"form"`
+   - GET/DELETE 通常 → `null`（无 body），如有 query 参数 → `has_query_params: true`
+6. **提取 request_body**：如果 content_type 非 null，将字段映射为参数
    - 对象格式 `{"field": "type"}` → 提取 field 名和类型
-   - 每个字段的默认值由类型推断：`"string"` → `""`, `"integer"` → `0`, `"boolean"` → `False`
-6. **提取 response schema**：`response` 作为期望的响应结构
+   - 默认值推断：`"string"` → `""`, `"integer"` → `0`, `"boolean"` → `False`
+   - 设置 `has_body: true`
+
+### 2-续. 接口变量补充
+
+每个 endpoint 额外计算：
+| 变量 | 来源 | 说明 |
+|------|------|------|
+| `content_type` | 字段或推断 | `"json"` / `"form"` / `"multipart"` / `null` |
+| `has_body` | content_type 非 null | `true` / `false` |
+| `has_query_params` | parameters 中有 query 类型 | `true` / `false` |
+| `has_file` | content_type == "multipart" | `true` / `false` |
    - 类型映射：`"string"` → `"string"`, `"integer"` → `"integer"`, `1` → `"integer"`, `"text"` → `"string"`
 7. **确定 expected_ok_status**：
    - POST → `201`

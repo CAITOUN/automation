@@ -13,21 +13,40 @@ def assert_ok(resp, expected_status=200):
 def assert_field(resp, json_path, expected_type=None):
     """按 JSON 路径断言字段存在。
 
-    json_path: "data.token" → resp.json()["data"]["token"]
+    支持点号路径 + 数组索引：
+      "data.token"     → resp.json()["data"]["token"]
+      "items[0].name"  → resp.json()["items"][0]["name"]
+      "data.list[2]"   → resp.json()["data"]["list"][2]
     """
     if hasattr(resp, "json") and callable(resp.json):
         body = resp.json()
     else:
         body = resp
 
-    keys = json_path.split(".")
     current = body
-    for i, key in enumerate(keys):
-        partial = ".".join(keys[: i + 1])
-        assert key in current, (
-            f"字段 '{partial}' 不存在（当前 keys: {list(current.keys())}）"
-        )
-        current = current[key]
+    segments = json_path.split(".")
+
+    for seg in segments:
+        # 处理数组索引：[N] → 先取 key 再取索引
+        if "[" in seg and seg.endswith("]"):
+            key, bracket = seg.split("[", 1)
+            idx = int(bracket.rstrip("]"))
+            assert key in current, (
+                f"字段 '{key}' 不存在（当前 keys: {list(current.keys())}）"
+            )
+            current = current[key]
+            assert isinstance(current, list), (
+                f"字段 '{key}' 不是数组，无法取 [{idx}]"
+            )
+            assert idx < len(current), (
+                f"数组索引 [{idx}] 越界（数组长度: {len(current)}）"
+            )
+            current = current[idx]
+        else:
+            assert seg in current, (
+                f"字段 '{seg}' 不存在（当前 keys: {list(current.keys() if isinstance(current, dict) else current)}）"
+            )
+            current = current[seg]
 
     assert current is not None, f"字段 '{json_path}' 的值为 None"
 

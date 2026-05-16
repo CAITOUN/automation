@@ -112,6 +112,9 @@ description: |
 | `path_fstring` | 含 Python f-string 占位的路径 | `/api/user/{userId}` |
 | `path_params` | 路径中 {var} 的参数列表 | `[{"name": "userId"}]` |
 | `all_params` | 所有参数（path + query）合并 | 同上结构 |
+| `content_type` | 请求体类型 | `"json"` / `"form"` / `"multipart"` / `null` |
+| `has_body` | 是否有请求体 | `true` / `false` |
+| `has_query_params` | 是否有 query 参数 | `true` / `false` |
 | `body_default` | request body 默认值 Python 字面量 | `{"username": "", "password": ""}` |
 | `field_checks` | 响应字段 assert 语句列表 | `['assert "code" in body', ...]` |
 | `response_schema` | 响应 JSON Schema Python dict | `{"type": "object", ...}` |
@@ -193,20 +196,52 @@ description: |
 | `templates/requirements.txt.j2` | `requirements.txt` | 每次更新 |
 | `templates/ci.yml.j2` | `.github/workflows/test.yml` | 询问用户后生成 |
 
-### 场景用例生成条件
+### 场景用例生成（L2/L3 策略时触发）
 
-如果 `parsed_data` 中有多个 endpoint 被标记为同一 `tags` 组，且用户选择了 L2 或 L3 策略，则需要提示用户：
+首先，自动分析 `parsed_data` 中同 tag 的接口依赖关系，按 POST → GET → PUT → DELETE 顺序初步编排候选链路。
+
+然后询问用户选择链路生成方式：
 
 ```
-检测到以下接口组可以生成场景用例：
-- 用户模块：POST /login → GET /user/{id} → PUT /user/{id}
+🔗 检测到以下候选链路：
 
-是否生成场景/链式用例？
-[A] 是，自动编排依赖关系
-[B] 否，只生成单接口用例
+自动推断结果：
+  1. 用户模块：POST /api/user/login → GET /api/user/{userId} → PUT /api/user/{userId}
+  2. 订单模块：POST /api/order → GET /api/order/{orderId}
+
+请选择链路生成方式：
+[A] 全部生成 — 以上所有链路自动生成场景用例
+[B] 逐条确认 — 让我逐条选择哪些要生成
+[C] 手动定义 — 我自己输入链路 JSON
+[D] 跳过 — 暂不生成场景用例
 ```
 
-如果用户选择 [A]，则为该 tag 组生成场景用例文件。
+**模式 A（全部生成）**：按候选链路逐一生成 `scenarios/test_{flow_name}.py`。
+
+**模式 B（逐条确认）**：
+```
+链路 1/2：用户模块：POST /login → GET /user/{id} → PUT /user/{id}
+  [Y] 生成  [N] 跳过  [E] 编辑此链路
+```
+如果用户选 [E]，允许修改接口顺序或增删步骤。
+
+**模式 C（手动定义）**：用户提供 JSON 描述链路：
+```json
+{
+  "scenarios": [
+    {
+      "name": "user_register_login_flow",
+      "description": "用户注册→登录→查信息完整流程",
+      "steps": [
+        {"endpoint": "user_register", "extract": {"user_id": "data.user_id"}},
+        {"endpoint": "user_login", "extract": {"token": "data.token"}},
+        {"endpoint": "get_user", "params_from_prev": {"userId": "user_id"}}
+      ]
+    }
+  ]
+}
+```
+解析 JSON 中的 step 映射，生成对应的场景测试文件。
 
 ---
 
