@@ -195,6 +195,20 @@ description: |
 | `templates/gitignore.j2` | `.gitignore` | 首次生成 |
 | `templates/requirements.txt.j2` | `requirements.txt` | 每次更新 |
 | `templates/ci.yml.j2` | `.github/workflows/test.yml` | 询问用户后生成 |
+| `templates/setup_check.py.j2` | `scripts/setup_check.py` | 每次生成 |
+| `templates/README.md.j2` | `README.md` | 每次更新 |
+
+**README 和 setup_check 变量说明**：
+
+`README.md.j2` 需额外计算以下项目级变量：
+- `scenario_descriptions`：`{scenario_name: description}` 映射
+- `test_counts`：`{endpoint_name: test_count}` — 根据 strategy_level 决定（L1=1, L2=3, L3=5~8）
+- `scenario_endpoints`：场景中涉及的 endpoint name 列表
+- `total_test_count` / `scenario_count`：汇总数量
+
+上述变量均可从 `parsed_data` + `strategy_level` + 已生成的 scenarios 列表推导，无需用户额外输入。
+
+`setup_check.py.j2` 根据 `auth_mode` 决定检查哪些 `.env` 变量（token 模式检查 `auth_env_var`，session 模式检查 `LOGIN_USERNAME`/`LOGIN_PASSWORD`）。
 
 ### 场景用例生成（L2/L3 策略时触发）
 
@@ -284,9 +298,14 @@ description: |
   - 测试策略：L2 功能测试
   - 认证模式：会话登录
 
+📄 文档：
+  - README.md — 项目说明、配置指南、运行方式、如何扩展
+  - scripts/setup_check.py — 环境检查脚本
+
 🚀 快速开始：
   cd <项目路径>
   cp .env.example .env   # 编辑 .env 填入实际配置
   pip install -r requirements.txt
+  python scripts/setup_check.py   # 检查环境是否就绪
   pytest -v              # 运行测试
 ```

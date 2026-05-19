@@ -1,0 +1,302 @@
+# {{ title }}
+
+{{ description }}
+
+基于 **Pytest + Requests** 的接口自动化测试项目，由 [automation skill](https://github.com/CAITOUN/automation) 自动生成。
+
+---
+
+## 快速开始
+
+```bash
+# 1. 安装依赖
+pip install -r requirements.txt
+
+# 2. 配置环境
+cp .env.example .env
+# 编辑 .env 填入实际的 BASE_URL 和认证信息
+
+# 3. 运行测试
+python scripts/setup_check.py   # 环境检查
+pytest -v                        # 运行全部测试
+```
+
+---
+
+## 环境要求
+
+| 依赖 | 版本 | 说明 |
+|------|------|------|
+| Python | >= 3.10 | 推荐 3.12 |
+| requests | >= 2.28.0 | HTTP 客户端 |
+| pytest | >= 7.0.0 | 测试框架 |
+| python-dotenv | >= 1.0.0 | 环境变量管理 |
+{% if include_allure %}
+| allure-pytest | >= 2.13.0 | Allure 报告 |
+{% endif %}
+
+建议使用虚拟环境：
+
+```bash
+python -m venv venv
+source venv/bin/activate   # Linux/Mac
+venv\Scripts\activate      # Windows
+pip install -r requirements.txt
+```
+
+---
+
+## 项目结构
+
+```
+├── conftest.py              # 全局 fixtures（base_url、auth、session）
+├── config/settings.py       # 环境配置类（读取 .env）
+├── api/                     # 接口封装层
+│   ├── base_client.py       # HTTP 客户端（日志、脱敏、重试）
+{% for mod in modules %}
+│   └── {{ mod }}_api.py     # {{ modules[mod].description }}
+{% endfor %}
+├── testcases/               # 单接口测试用例
+{% for mod in modules %}
+│   └── test_{{ mod }}.py    # {{ modules[mod].description }} 测试
+{% endfor %}
+├── scenarios/               # 场景/链式测试用例
+{% for scenario in scenarios %}
+│   └── {{ scenario }}.py    # {{ scenario_descriptions[scenario] }}
+{% endfor %}
+├── data/                    # 测试数据
+├── utils/                   # 工具
+│   ├── validator.py         # 快捷断言（assert_ok / assert_field / assert_schema）
+│   └── logger.py            # 日志配置
+├── scripts/
+│   └── setup_check.py       # 环境检查脚本
+├── .env.example             # 环境变量模板
+├── .gitignore
+├── requirements.txt
+└── generator.json           # 增量更新 manifest
+```
+
+---
+
+## 配置说明
+
+编辑 `.env` 文件：
+
+```ini
+# 被测服务地址（必填）
+BASE_URL={{ base_url }}
+
+# 请求超时和重试
+TIMEOUT=30
+RETRY_COUNT=0
+```
+{% if auth_mode == "token" %}
+```ini
+# 认证 Token（必填）
+{{ auth_env_var }}=your_api_key_here
+```
+填入你的 API Key / Token，测试运行时会自动加到请求 Header（`{{ auth_header_name }}: {{ auth_prefix }}{token}`）。
+
+{% elif auth_mode == "session" %}
+```ini
+# 登录认证（必填）
+LOGIN_USERNAME=admin
+LOGIN_PASSWORD=your_password_here
+```
+测试运行前会先调登录接口获取 Token，后续接口自动携带。
+
+{% endif %}
+---
+
+## 运行测试
+
+### 基础命令
+
+```bash
+pytest -v                                    # 运行全部测试
+pytest -v -k "test_login"                    # 只跑名称含 login 的测试
+pytest -v testcases/test_user.py             # 只跑用户模块
+pytest -v --tb=long                          # 失败时显示完整堆栈
+pytest -v --log-cli-level=INFO               # 控制台显示 INFO 日志
+```
+
+### 生成报告
+
+```bash
+pytest -v --html=report.html                 # HTML 报告（需 pip install pytest-html）
+{% if include_allure %}
+pytest -v --alluredir=allure-results         # Allure 报告
+allure serve allure-results
+{% endif %}
+```
+
+### 跳过某些测试
+
+```bash
+pytest -v -k "not smoke"                     # 跳过冒烟测试
+pytest -v -m "not slow"                      # 跳过标记为 slow 的测试
+```
+
+---
+
+## 测试策略
+
+本项目采用 **{{ strategy_level }}** 级测试策略。
+{% if strategy_level == "L1" %}
+**冒烟测试** — 每个接口一个用例，验证接口可正常调用、返回正确状态码。适合 CI 快速检查。
+
+用例覆盖：状态码 + 响应体非空。
+{% elif strategy_level == "L2" %}
+**功能测试（推荐）** — 每个接口 2-3 个用例，验证核心字段存在性、类型正确性、Schema 结构。
+
+用例覆盖：
+- 正常请求 + 字段断言
+- Response Schema 校验
+- 响应时间检查
+{% if scenarios %}
+- 场景/链式用例
+{% endif %}
+{% elif strategy_level == "L3" %}
+**全面测试** — 每个接口 5-8 个用例，覆盖正常、异常、边界、安全场景。
+
+用例覆盖：
+- 正常请求 + 字段断言
+- Response Schema 校验
+- 响应时间检查
+- 必填参数缺失
+- 参数类型错误
+- 边界值/特殊值
+- 未授权访问
+- 资源不存在（GET/PUT/DELETE）
+- 重复创建（POST）
+{% if scenarios %}
+- 场景/链式用例
+{% endif %}
+{% endif %}
+
+---
+
+## 生成覆盖清单
+
+| 模块 | 接口 | 用例数 | 场景 |
+|------|------|--------|------|
+{% for mod in modules %}
+{% for ep in modules[mod].endpoints %}
+| {{ mod }} | {{ ep.method }} {{ ep.path }} | {{ test_counts[ep.name] }} | {% if ep.name in scenario_endpoints %}✓{% else %}-{% endif %} |
+{% endfor %}
+{% endfor %}
+
+总用例数：**{{ total_test_count }}** | 场景用例：**{{ scenario_count }}**
+
+---
+
+## 如何扩展
+
+### 添加新接口
+
+1. 手动编写 `api/{module}_api.py` 中新增方法
+2. 在 `testcases/test_{module}.py` 中编写用例
+3. 重新运行 `/automation` skill 做增量更新（已有接口不会被覆盖）
+
+### 添加自定义 Fixture
+
+编辑 `conftest.py` 中 `USER_CODE` 区域：
+
+```python
+# === USER_CODE_START ===
+@pytest.fixture(scope="session")
+def db_connection():
+    import psycopg2
+    conn = psycopg2.connect(...)
+    yield conn
+    conn.close()
+# === USER_CODE_END ===
+```
+
+### 添加场景用例
+
+编辑 `scenarios/` 下的文件，或新建文件，使用 `scenario_context` 在步骤间传递数据：
+
+```python
+def test_my_flow(api, auth_headers, scenario_context):
+    # 步骤1：创建资源
+    resp = api.create_order(headers=auth_headers, data={"item": "book"})
+    order_id = resp.json()["data"]["order_id"]
+    scenario_context["order_id"] = order_id
+
+    # 步骤2：查询资源（使用上一步的数据）
+    resp2 = api.get_order(order_id, headers=auth_headers)
+    assert resp2.status_code == 200
+```
+
+### 参数化测试
+
+在 `data/{module}_data.py` 中定义参数列表：
+
+```python
+LOGIN_DATA = [
+    ("admin", "123456", 200),
+    ("", "123456", 400),
+    ("admin", "", 400),
+]
+```
+
+在用例中引用：
+
+```python
+@pytest.mark.parametrize("username,password,expected", LOGIN_DATA)
+def test_login_params(api, auth_headers, username, password, expected):
+    resp = api.login(headers=auth_headers, data={"username": username, "password": password})
+    assert resp.status_code == expected
+```
+
+---
+
+## 日志
+
+测试运行日志同时输出到：
+
+- **控制台** — WARNING 级别（安静模式），加 `--log-cli-level=DEBUG` 可看到详细信息
+- **文件** — `test_run.log`，DEBUG 全量日志，每次运行覆盖
+
+敏感字段（password、token、secret、Authorization 等）在日志中自动脱敏为 `***`。
+
+---
+
+## 常见问题
+
+**Q: 运行 `pytest` 报 `ModuleNotFoundError: No module named 'requests'`**
+
+A: 先执行 `pip install -r requirements.txt` 安装依赖。
+
+**Q: 测试全部 401/403 失败**
+
+A: 检查 `.env` 中的认证配置是否正确填入。
+
+**Q: 提示 `BASE_URL` 未配置**
+
+A: 确保 `.env` 文件存在且 `BASE_URL` 有值（不要用 `.env.example` 的默认值）。
+
+**Q: 怎么只跑某个接口的测试**
+
+A: `pytest -v -k "login"` 筛选名称包含 "login" 的用例。
+
+**Q: 增量更新会覆盖我写的用例吗**
+
+A: 不会。新增接口只会追加到已有文件末尾，不会修改你手动编写的部分。核心框架文件有 `AUTO_GENERATED` / `USER_CODE` 区域保护。
+
+---
+
+## 技术栈
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Pytest](https://img.shields.io/badge/Pytest-7%2B-orange)
+![Requests](https://img.shields.io/badge/Requests-2.28%2B-green)
+
+{% if include_allure %}
+![Allure](https://img.shields.io/badge/Allure-2.13%2B-yellow)
+{% endif %}
+
+---
+
+> 本项目由 [automation](https://github.com/CAITOUN/automation) Skill 于 {{ generated_at }} 生成 · 测试策略 {{ strategy_level }} · 认证模式 {{ auth_mode }}

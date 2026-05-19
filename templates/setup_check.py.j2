@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""环境检查脚本 — 验证测试项目运行环境是否就绪。"""
+
+import sys
+import os
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+REQUIRED_PYTHON = (3, 10)
+REQUIRED_PACKAGES = ["requests", "pytest", "dotenv"]
+
+CHECKS_PASSED = 0
+CHECKS_FAILED = 0
+
+
+def ok(msg: str):
+    global CHECKS_PASSED
+    CHECKS_PASSED += 1
+    print(f"  [OK] {msg}")
+
+
+def fail(msg: str):
+    global CHECKS_FAILED
+    CHECKS_FAILED += 1
+    print(f"  [FAIL] {msg}")
+
+
+def warn(msg: str):
+    print(f"  [WARN] {msg}")
+
+
+# ——— 1. Python 版本 ———
+print("━ Python 环境 ━")
+py_ver = sys.version_info[:2]
+if py_ver >= REQUIRED_PYTHON:
+    ok(f"Python {py_ver[0]}.{py_ver[1]}")
+else:
+    fail(f"Python {py_ver[0]}.{py_ver[1]}（需要 >= {REQUIRED_PYTHON[0]}.{REQUIRED_PYTHON[1]}）")
+
+# ——— 2. 依赖包 ———
+print("\n━ 依赖检查 ━")
+missing_pkgs = []
+for pkg in REQUIRED_PACKAGES:
+    try:
+        __import__(pkg)
+        ok(pkg)
+    except ImportError:
+        fail(pkg)
+        missing_pkgs.append(pkg)
+
+if missing_pkgs:
+    print(f"\n  请运行: pip install -r {PROJECT_ROOT / 'requirements.txt'}")
+
+# ——— 3. .env 文件 ———
+print("\n━ 配置文件 ━")
+env_file = PROJECT_ROOT / ".env"
+env_example = PROJECT_ROOT / ".env.example"
+
+if env_file.exists():
+    ok(".env 文件存在")
+else:
+    if env_example.exists():
+        fail(".env 文件不存在")
+        print(f"  请运行: cp .env.example .env")
+        print(f"  然后编辑 .env 填入实际配置")
+    else:
+        fail(".env 和 .env.example 都不存在")
+    # 后续检查无法进行
+    print(f"\n{'='*50}")
+    print(f"结果: {CHECKS_PASSED} 通过, {CHECKS_FAILED} 失败")
+    sys.exit(1 if CHECKS_FAILED > 0 else 0)
+
+# ——— 4. 环境变量 ———
+print("\n━ 环境变量 ━")
+
+# 用简单方式读取 .env（不依赖 python-dotenv，因为它可能还没装）
+env_vars = {}
+with open(env_file, encoding="utf-8") as f:
+    for line in f:
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, _, val = line.partition("=")
+            env_vars[key.strip()] = val.strip()
+
+# BASE_URL 检查
+base_url = env_vars.get("BASE_URL", "")
+if not base_url:
+    fail("BASE_URL 未配置（.env 中为默认值或为空）")
+elif "example.com" in base_url or "your_" in base_url.lower():
+    warn(f"BASE_URL = {base_url}（看起来是默认值，请替换为实际地址）")
+elif base_url.startswith("http"):
+    ok(f"BASE_URL = {base_url}")
+else:
+    warn(f"BASE_URL = {base_url}（格式可能不正确，应以 http:// 或 https:// 开头）")
+
+{% if auth_mode == "token" %}
+# Token 检查
+token = env_vars.get("{{ auth_env_var }}", "")
+if not token or token in ("your_api_key_here", ""):
+    fail("{{ auth_env_var }} 未配置（需要填入实际的 API Key / Token）")
+else:
+    ok("{{ auth_env_var }} 已配置")
+
+{% elif auth_mode == "session" %}
+# 登录凭证检查
+username = env_vars.get("LOGIN_USERNAME", "")
+password = env_vars.get("LOGIN_PASSWORD", "")
+if not username or username == "admin":
+    warn(f"LOGIN_USERNAME = {username}（使用默认值）")
+else:
+    ok("LOGIN_USERNAME 已配置")
+
+if not password or password in ("your_password_here", ""):
+    fail("LOGIN_PASSWORD 未配置（需要填入实际密码）")
+else:
+    ok("LOGIN_PASSWORD 已配置 (***)")
+
+{% endif %}
+# ——— 5. 项目结构 ———
+print("\n━ 项目完整性 ━")
+required_dirs = ["api", "testcases", "utils", "config", "data", "scenarios"]
+for d in required_dirs:
+    if (PROJECT_ROOT / d).is_dir():
+        ok(f"目录 {d}/")
+    else:
+        fail(f"目录 {d}/ 缺失")
+
+required_files = ["conftest.py", "api/base_client.py", "utils/validator.py"]
+for f in required_files:
+    if (PROJECT_ROOT / f).is_file():
+        ok(f"文件 {f}")
+    else:
+        fail(f"文件 {f} 缺失")
+
+# ——— 6. 网络连通性（可选） ———
+print("\n━ 连通性检查 ━")
+if base_url.startswith("http"):
+    try:
+        import urllib.request
+        req = urllib.request.Request(base_url, method="HEAD")
+        resp = urllib.request.urlopen(req, timeout=10)
+        ok(f"{base_url} 可达（HTTP {resp.status}）")
+    except Exception as e:
+        warn(f"{base_url} 不可达: {e}")
+        warn("如果服务在本地或内网，请确认服务已启动且 .env 中 BASE_URL 正确")
+else:
+    warn("BASE_URL 不是有效 HTTP 地址，跳过连通性检查")
+
+# ——— 汇总 ———
+print(f"\n{'='*50}")
+print(f"结果: {CHECKS_PASSED} 通过, {CHECKS_FAILED} 失败, {CHECKS_PASSED + CHECKS_FAILED} 项检查")
+
+if CHECKS_FAILED == 0:
+    print("\n环境就绪，可以开始测试：")
+    print("  cd", PROJECT_ROOT)
+    print("  pytest -v")
+    sys.exit(0)
+else:
+    print(f"\n请先解决以上 {CHECKS_FAILED} 个问题，然后重新运行此脚本。")
+    sys.exit(1)
