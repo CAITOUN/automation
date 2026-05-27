@@ -1,0 +1,11 @@
+# Sensitive / project-local files — do not commit
+CLAUDE.md
+README.md
+examples/
+planning/
+docs/
+findings.md
+progress.md
+task_plan.md
+*.postman.json
+output/
